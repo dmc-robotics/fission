@@ -18,13 +18,20 @@ bundle exec ruby -Ilib:test test/test_combiner.rb -n test_combine_tool_change_in
 
 ## Architecture
 
-The gem has three core classes under `lib/fission/`:
+The gem has five modules/classes under `lib/fission/`:
 
-- **GcodeFile** (`gcode_file.rb`) — Parses a Fusion 360 G-code file into `header`, `body`, and `footer` arrays. Header/footer detection uses regex patterns matching G-code conventions (G17, G21, G90, M30, etc.). The boundary between header and body is the first tool call or spindle command (T/M lines).
+- **GcodeFile** (`gcode_file.rb`) — Parses a Fusion 360 G-code file into `header`, `body`, and `footer` arrays. Header/footer detection uses regex patterns matching G-code conventions (G17, G21, G90, M30, etc.). The boundary between header and body is the first tool call or spindle command (T/M lines). Exposes a `validator` for accessing validation results (errors, warnings, units, tools).
 
-- **Combiner** (`combiner.rb`) — Takes an ordered array of steps (GcodeFile objects and/or numeric angles) and produces a single combined G-code string. Uses the first file's header and last file's footer. Numeric steps insert M5 (spindle stop), Z retract, and `G0 A<angle>`.
+- **Combiner** (`combiner.rb`) — Takes an ordered array of steps (GcodeFile objects and/or numeric angles) and produces a single combined G-code string. Uses the first file's header and last file's footer. Header comments from subsequent files are preserved in the combined output. Numeric steps insert M5 (spindle stop), Z retract, and `G0 A<angle>`. Angles are validated to be in the 0-360 range.
 
-- **CLI** (`cli.rb`) — Parses argv into commands. `combine FILE1 [ANGLE1] FILE2 ...` — numbers are angles (A-axis rotations), everything else is a file. Multiple files can appear between angles. Output goes to stdout by default or to a file with `-o`.
+- **Validator** (`validator.rb`) — Stateful G-code validator that checks for Carvera compatibility. Tracks spindle state, tool loads, feed rate, air blast, units (mm/in), and tool descriptions across lines. Produces errors (unsupported codes, missing parameters, cutting with spindle off, etc.) and warnings (missing air blast, tools outside ATC range, mixed units). Resets state at `(--- Begin: ... ---)` markers in combined output.
+
+- **Codes** (`codes.rb`) — Reference data for all supported Carvera G-codes and M-codes with syntax and descriptions.
+
+- **CLI** (`cli.rb`) — Parses argv into commands:
+  - `combine FILE1 [ANGLE1] FILE2 ...` — numbers are angles (A-axis rotations), everything else is a file. Multiple files can appear between angles. Output goes to stdout by default or to a file with `-o`. Validates both inputs and combined output.
+  - `validate FILE [FILE ...]` — validates files and prints a summary (units, tools) on success.
+  - `codes` — lists all supported Carvera G-codes and M-codes.
 
 ## Carvera G-code Notes
 

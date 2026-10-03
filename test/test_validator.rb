@@ -434,6 +434,38 @@ class TestValidator < Minitest::Test
     refute_empty warnings
   end
 
+  # --- Mixed units ---
+
+  def test_mixed_units_is_warning
+    v = validate(["G21", "G17", "G20"])
+    warnings = v.warnings.select { |w| w.message.include?("Mixed units") }
+    assert_equal 1, warnings.size
+    assert_match(/mm to in/, warnings.first.message)
+  end
+
+  def test_same_units_repeated_is_clean
+    v = validate(["G21", "G17", "G21"])
+    warnings = v.warnings.select { |w| w.message.include?("Mixed units") }
+    assert_empty warnings
+  end
+
+  def test_units_tracking
+    v = validate(["G21"])
+    assert_equal "mm", v.units
+
+    v = validate(["G20"])
+    assert_equal "in", v.units
+  end
+
+  # --- Tool tracking ---
+
+  def test_tools_tracked
+    v = validate(["T1 M6", "S10000 M3", "M5", "T2 M6"])
+    assert_equal 2, v.tools.size
+    assert_equal 1, v.tools[0][:number]
+    assert_equal 2, v.tools[1][:number]
+  end
+
   # --- Integration: fixture files validate clean ---
 
   def test_roughing_fixture_validates_clean

@@ -30,7 +30,14 @@ module Fission
     end
 
     def run
-      if @argv.empty? || @argv.include?("-h") || @argv.include?("--help")
+      if @argv.empty?
+        puts USAGE
+        return 0
+      end
+
+      output_file = extract_output_option
+
+      if @argv.include?("-h") || @argv.include?("--help")
         puts USAGE
         return 0
       end
@@ -39,8 +46,6 @@ module Fission
         puts "fission #{Fission::VERSION}"
         return 0
       end
-
-      output_file = extract_output_option
 
       command = @argv.shift
       case command
@@ -85,6 +90,12 @@ module Fission
       end
 
       steps = parse_args(@argv)
+      file_count = steps.count { |s| s.is_a?(GcodeFile) }
+      if file_count < 2
+        $stderr.puts "Error: combine requires at least two files"
+        $stderr.puts USAGE
+        return 1
+      end
       combiner = Combiner.new(steps)
 
       input_results = combiner.validate_inputs
@@ -109,13 +120,15 @@ module Fission
       has_errors = false
       @argv.each do |path|
         file = GcodeFile.new(path)
-        file.validation_errors.each do |e|
+        validator = file.validator
+        validator.errors.each do |e|
           $stderr.puts format_result(file.filename, e, :error)
           has_errors = true
         end
-        file.validation_warnings.each do |w|
+        validator.warnings.each do |w|
           $stderr.puts format_result(file.filename, w, :warning)
         end
+        print_summary(file.filename, validator) if validator.errors.empty?
       end
 
       has_errors ? 1 : 0
@@ -150,6 +163,21 @@ module Fission
       end
       validator.warnings.each do |w|
         $stderr.puts format_result("combined output", w, :warning)
+      end
+    end
+
+    def print_summary(filename, validator)
+      green = $stderr.tty? ? "\e[32m" : ""
+      reset = $stderr.tty? ? "\e[0m" : ""
+      $stderr.puts "#{green}#{filename}: ok#{reset}"
+      $stderr.puts "  Units: #{validator.units || "unknown"}"
+      if validator.tools.empty?
+        $stderr.puts "  Tools: none"
+      else
+        validator.tools.each do |tool|
+          desc = tool[:description] ? " - #{tool[:description]}" : ""
+          $stderr.puts "  T#{tool[:number]}#{desc}"
+        end
       end
     end
 

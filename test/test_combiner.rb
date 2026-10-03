@@ -44,6 +44,13 @@ class TestCombiner < Minitest::Test
     assert_includes result, "(--- Begin: finishing.nc ---)"
   end
 
+  def test_combine_includes_header_comments_from_all_files
+    result = Fission::Combiner.new([@roughing, @finishing, @third]).combine
+    assert_includes result, "(roughing)"
+    assert_includes result, "(finishing)"
+    assert_includes result, "(third operation)"
+  end
+
   # --- fourth_axis (files with rotation angles) ---
 
   def test_rotation_between_files
@@ -118,5 +125,49 @@ class TestCombiner < Minitest::Test
       Fission::Combiner.new([@roughing, @finishing, 90])
     end
     assert_includes error.message, "end with a file"
+  end
+
+  def test_negative_angle_is_error
+    error = assert_raises(Fission::Error) do
+      Fission::Combiner.new([@roughing, -90, @finishing])
+    end
+    assert_includes error.message, "negative"
+  end
+
+  def test_angle_over_360_is_error
+    error = assert_raises(Fission::Error) do
+      Fission::Combiner.new([@roughing, 361, @finishing])
+    end
+    assert_includes error.message, "greater than 360"
+  end
+
+  def test_angle_360_is_allowed
+    result = Fission::Combiner.new([@roughing, 360, @finishing]).combine
+    assert_includes result, "G0 A360"
+  end
+
+  def test_angle_0_is_allowed
+    result = Fission::Combiner.new([@roughing, 0, @finishing]).combine
+    assert_includes result, "G0 A0"
+  end
+
+  def test_consecutive_angles
+    result = Fission::Combiner.new([@roughing, 90, 180, @finishing]).combine
+    assert_includes result, "G0 A90"
+    assert_includes result, "G0 A180"
+  end
+
+  # --- combined output validation ---
+
+  def test_combined_output_with_rotation_validates
+    combiner = Fission::Combiner.new([@roughing, 90, @finishing])
+    combiner.combine
+    validator = combiner.validate_combined
+    assert validator.valid?, "Combined with rotation should validate but got errors: #{validator.errors.map(&:message).join(', ')}"
+  end
+
+  def test_validate_combined_before_combine_raises_runtime_error
+    combiner = Fission::Combiner.new([@roughing, @finishing])
+    assert_raises(RuntimeError) { combiner.validate_combined }
   end
 end

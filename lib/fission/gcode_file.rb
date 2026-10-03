@@ -9,7 +9,7 @@ module Fission
   # - Footer: spindle stop, retract, program end (M30/M2/%)
   class GcodeFile
     attr_reader :path, :lines, :header, :body, :footer,
-                :validation_errors, :validation_warnings
+                :validation_errors, :validation_warnings, :validator
 
     # Lines that mark the end of the cutting program
     FOOTER_PATTERNS = [
@@ -100,9 +100,9 @@ module Fission
     end
 
     def run_validation
-      validator = Validator.new(@lines)
-      @validation_errors = validator.errors
-      @validation_warnings = validator.warnings
+      @validator = Validator.new(@lines)
+      @validation_errors = @validator.errors
+      @validation_warnings = @validator.warnings
     end
 
     def footer_line?(line)

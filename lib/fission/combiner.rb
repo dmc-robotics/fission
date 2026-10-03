@@ -26,6 +26,7 @@ module Fission
         if step.is_a?(GcodeFile)
           lines << ""
           lines << "(--- Begin: #{step.filename} ---)"
+          lines.concat(header_comments(step))
           lines.concat(step.body)
           lines << "(--- End: #{step.filename} ---)"
         else
@@ -48,7 +49,7 @@ module Fission
     end
 
     def validate_combined
-      raise Error, "Must call #combine before #validate_combined" unless @combined_lines
+      raise "Must call #combine before #validate_combined" unless @combined_lines
 
       Validator.new(@combined_lines)
     end
@@ -77,6 +78,18 @@ module Fission
       raise Error, "At least two files are required" if files.length < 2
       raise Error, "Steps must start with a file, not an angle" unless @steps.first.is_a?(GcodeFile)
       raise Error, "Steps must end with a file, not an angle" unless @steps.last.is_a?(GcodeFile)
+      angles.each do |angle|
+        raise Error, "Angle #{angle} is negative — use a positive angle (0-360)" if angle.negative?
+        raise Error, "Angle #{angle} is greater than 360 degrees" if angle > 360
+      end
+    end
+
+    def angles
+      @steps.select { |s| s.is_a?(Numeric) }
+    end
+
+    def header_comments(gcode_file)
+      gcode_file.header.select { |line| line.strip.start_with?("(") }
     end
 
     def format_angle(angle)

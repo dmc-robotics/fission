@@ -20,7 +20,7 @@ This gem is not yet on Rubygems. You have to build and install it locally:
 ```bash
 # from the gem's root directory:
 gem build fission.gemspec
-gem install fission-0.1.0.gem
+gem install fission-0.2.0.gem
 
 ```
 
@@ -70,6 +70,14 @@ fission validate roughing.nc finishing.nc
 
 This is a sanity check, not a full G-code simulator. Always verify output with a simulator and/or dry run on your machine.
 
+When validation passes, Fission prints a summary showing the detected units (mm/in) and the tools used in each file:
+
+```
+roughing.nc: ok
+  Units: mm
+  T1 - T1 D=6.35 CR=0 - ZMIN=-3 - flat end mill
+```
+
 **Errors** halt output and exit with code 1. **Warnings** print to stderr but still produce output.
 
 ### Errors
@@ -94,6 +102,14 @@ This is a sanity check, not a full G-code simulator. Always verify output with a
 | No tool before spindle start | M3/M4 without a prior tool change (T/M6) |
 | Air blast not on | G1/G2/G3 cutting move without M7 (air blast) active |
 | Tool outside ATC range | Tool number T7-T99 requires manual tool change (ATC supports T1-T6) |
+
+## Supported Codes
+
+List all G-codes and M-codes supported by the Carvera:
+
+```bash
+fission codes
+```
 
 ## Workflow
 

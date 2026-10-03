@@ -208,4 +208,57 @@ class TestCLI < Minitest::Test
     assert_equal 1, @status
     assert_includes err, "Unknown option"
   end
+
+  # --- codes command ---
+
+  def test_codes_command
+    out, = capture_io { @status = Fission::CLI.new(["codes"]).run }
+    assert_equal 0, @status
+    assert_includes out, "Supported Carvera G-codes"
+    assert_includes out, "Supported Carvera M-codes"
+    assert_includes out, "G0"
+    assert_includes out, "M6"
+  end
+
+  # --- missing -o filename ---
+
+  def test_combine_missing_output_filename
+    _, err = capture_io do
+      @status = Fission::CLI.new([
+        "combine",
+        "-o"
+      ]).run
+    end
+    assert_equal 1, @status
+    assert_includes err, "Missing output filename"
+  end
+
+  # --- combine with only one file and an angle ---
+
+  def test_combine_one_file_and_angle
+    _, err = capture_io do
+      @status = Fission::CLI.new([
+        "combine",
+        fixture_path("roughing.nc"),
+        "90"
+      ]).run
+    end
+    assert_equal 1, @status
+    assert_includes err, "at least two files"
+  end
+
+  # --- validate prints summary on success ---
+
+  def test_validate_prints_summary
+    _, err = capture_io do
+      @status = Fission::CLI.new([
+        "validate",
+        fixture_path("roughing.nc")
+      ]).run
+    end
+    assert_equal 0, @status
+    assert_includes err, "roughing.nc: ok"
+    assert_includes err, "Units:"
+    assert_includes err, "T1"
+  end
 end

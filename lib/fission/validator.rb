@@ -32,7 +32,7 @@ module Fission
     AXIS_WORDS = %w[X Y Z A].freeze
     ARC_PARAMS = %w[I J R].freeze
 
-    attr_reader :errors, :warnings
+    attr_reader :errors, :warnings, :units, :tools
 
     def initialize(lines)
       @lines = lines
@@ -44,6 +44,10 @@ module Fission
       @air_on = false
       @air_warning_given = false
       @speed_set = false
+      @units = nil
+      @tools = []
+      @last_comment = nil
+      @last_tool_comment = nil
       validate
     end
 
@@ -58,6 +62,16 @@ module Fission
         line_number = index + 1
 
         reset_state if raw_line.match?(/\A\(--- Begin: .+ ---\)\z/)
+
+        # Track comments for tool descriptions (prefer Fusion-style "T1 D=..." comments)
+        if (match = raw_line.match(/\A\s*\((.+)\)\s*\z/))
+          comment = match[1]
+          if comment.match?(/\AT\d/)
+            @last_tool_comment = comment
+          else
+            @last_comment = comment
+          end
+        end
 
         line = strip_comments(raw_line).strip
 
@@ -107,7 +121,7 @@ module Fission
         check_tool_atc_range(m_codes, line_number, raw_line)
 
         # Update state after checks
-        update_state(g_codes, m_codes, has_t, t_value)
+        update_state(g_codes, m_codes, has_t, t_value, line_number, raw_line)
       end
     end
 
@@ -236,7 +250,20 @@ module Fission
 
     # --- State updates ---
 
-    def update_state(_g_codes, m_codes, has_t, t_value)
+    def update_state(g_codes, m_codes, has_t, t_value, line_number, raw_line)
+      if g_codes.include?("G21")
+        if @units && @units != "mm"
+          add_warning(line_number, raw_line, "Mixed units: switching from #{@units} to mm")
+        end
+        @units ||= "mm"
+      end
+      if g_codes.include?("G20")
+        if @units && @units != "in"
+          add_warning(line_number, raw_line, "Mixed units: switching from #{@units} to in")
+        end
+        @units ||= "in"
+      end
+
       if m_codes.include?("M3") || m_codes.include?("M4")
         @spindle_on = true
       end
@@ -246,9 +273,16 @@ module Fission
       end
 
       if m_codes.include?("M6")
+        tool_num = @pending_tool || @tool_loaded
+        if tool_num && @tools.none? { |t| t[:number] == tool_num }
+          @tools << { number: tool_num, description: @last_tool_comment }
+        end
         @tool_loaded = @pending_tool || @tool_loaded
         @pending_tool = nil
       end
+
+      @last_comment = nil if has_t || m_codes.any?
+      @last_tool_comment = nil if m_codes.include?("M6")
 
       @air_on = true if m_codes.include?("M7") || m_codes.include?("M8")
       @air_on = false if m_codes.include?("M9")

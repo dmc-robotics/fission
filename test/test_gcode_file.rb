@@ -37,4 +37,26 @@ class TestGcodeFile < Minitest::Test
   def test_filename
     assert_equal "roughing.nc", @file.filename
   end
+
+  def test_empty_file
+    Dir.mktmpdir do |dir|
+      path = File.join(dir, "empty.nc")
+      File.write(path, "")
+      file = Fission::GcodeFile.new(path)
+      assert_equal [], file.header
+      assert_equal [], file.body
+      assert_equal [], file.footer
+    end
+  end
+
+  def test_comment_only_file
+    Dir.mktmpdir do |dir|
+      path = File.join(dir, "comments.nc")
+      File.write(path, "(just a comment)\n")
+      file = Fission::GcodeFile.new(path)
+      assert_equal ["(just a comment)"], file.header
+      assert_equal [], file.body
+      assert_equal [], file.footer
+    end
+  end
 end
